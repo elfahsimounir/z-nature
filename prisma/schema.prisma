@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model user {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("user")
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  image       String?
+  parentId    String?
+  parent      Category? @relation("CategoryToChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryToChildren")
+  level       Int       @default(1)
+  products    Product[]
+
+  @@index([parentId])
+}
+
+
+model banner {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  image       String
+  desktopImage String?
+  mobileImage  String?
+  slug        String   @unique
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], name: "ProductBanners")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+}
+
+model promotion {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  image        String
+  desktopImage String?
+  mobileImage  String?
+  slug         String   @unique
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], name: "ProductPromotions")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+}
+
+model offer {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  image        String
+  desktopImage String?
+  mobileImage  String?
+  slug         String   @unique
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], name: "ProductOffers")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+}
+
+model publication {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  image        String
+  desktopImage String?
+  mobileImage  String?
+  slug         String   @unique
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], name: "ProductPublications")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+}
+
+model Order {
+  id         String         @id @default(cuid())
+  userId     String?
+  total      Float
+  shippingId String         @unique
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  shipping   ShippingDetail @relation(fields: [shippingId], references: [id])
+  user       user?          @relation(fields: [userId], references: [id])
+  products   OrderProduct[]
+}
+
+model OrderProduct {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model ShippingDetail {
+  id        String  @id @default(cuid())
+  fullName  String
+  address   String
+  telephone String
+  city      String
+  country   String  @default("Morocco")
+  email     String
+  orderId   String?
+  order     Order?
+}
+
+model Product {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  slug        String         @unique
+  description String
+  price       Float
+  discount    Float?
+  isNew       Boolean        
+  isPublished Boolean        @default(true)
+  image       String?
+  stock       Int
+  categoryId  String
+  brandId     String?
+  rating      Float          @default(0)
+  properties  Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now())
+  orders      OrderProduct[]
+  brand       Brand?         @relation(fields: [brandId], references: [id])
+  category    Category       @relation(fields: [categoryId], references: [id])
+  images      ProductImage[]
+  reviews     Review[]
+  hashtags    Hashtag[]      @relation("ProductHashtags")
+  banners     banner[]       @relation("ProductBanners")
+  promotions  promotion[]    @relation("ProductPromotions")
+  offers      offer[]        @relation("ProductOffers")
+  publications publication[] @relation("ProductPublications")
+
+  @@unique([id, slug])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String
+  image     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  content   String
+  rating    Int
+  email     String
+  fullName  String
+  productId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Hashtag {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  image       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+  products    Product[] @relation("ProductHashtags")
+
+  @@unique([id, name])
+}
+
+/// Services provided by the shop (bookable)
+model Service {
+  id           String          @id @default(cuid())
+  title        String
+  details      String?
+  price        Float
+  reviews      Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  images       ServiceImage[]
+  reservations Reservation[]
+}
+
+model ServiceImage {
+  id        String  @id @default(cuid())
+  url       String
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id])
+  fullName  String
+  phone     String
+  validated Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

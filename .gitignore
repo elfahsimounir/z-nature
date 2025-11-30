@@ -1,0 +1,53 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+dist/
+
+# Testing
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Env files (keep secrets out of git)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Prisma (ignore local DB files if ever used)
+prisma/*.db
+prisma/*.sqlite
+prisma/*.db-journal
+
+# Vercel
+.vercel/
+
+# Turborepo / misc caches
+.turbo/
+.cache/
+
+# Keys / certs
+*.pem
+*.key
