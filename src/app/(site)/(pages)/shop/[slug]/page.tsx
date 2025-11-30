@@ -68,7 +68,7 @@ interface Product {
 }
 
 const ShopDetailsPage = async ({ params }: { params: { slug: string } }) => {
-  const url = process.env.NEXT_PUBLIC_API_URL;
+  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
   const res = await fetch(`${url}/api/data`, {
     next: { revalidate: 60 }, // Revalidate every 60 seconds
