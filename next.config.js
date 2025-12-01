@@ -25,6 +25,16 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true, 
   },
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
+  },
+  // Skip database operations during build
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('_http_common');
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;

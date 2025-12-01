@@ -1,0 +1,11 @@
+{
+  "buildCommand": "prisma generate && prisma migrate deploy && next build",
+  "env": {
+    "SKIP_ENV_VALIDATION": "true"
+  },
+  "build": {
+    "env": {
+      "ENABLE_EXPERIMENTAL_COREPACK": "1"
+    }
+  }
+}

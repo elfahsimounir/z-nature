@@ -5,7 +5,6 @@ import AppleProvider from "next-auth/providers/apple";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-
 // Extend the default session type to include `id`
 declare module "next-auth" {
   interface Session {
