@@ -52,12 +52,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    - **Environments**: Select all (Production, Preview, Development)
 5. Click **Save**
 
-## ⚠️ Important Notes
+## ⚠️ CRITICAL - Set These BEFORE First Deployment
 
+**⚠️ YOU MUST SET THESE ENVIRONMENT VARIABLES IN VERCEL BEFORE DEPLOYING!**
+
+The build will fail without these variables:
+
+- **DATABASE_URL**: REQUIRED for Prisma to generate client during build
 - **NEXTAUTH_URL**: MUST match your actual Vercel deployment URL
 - **NEXTAUTH_SECRET**: MUST be generated using `openssl rand -base64 32`
-- **DATABASE_URL**: Use the **pooled** connection (port 6543) for better performance
-- **POSTGRES_URL_NON_POOLING**: Use for migrations only (port 5432)
+- **POSTGRES_URL_NON_POOLING**: Required for migrations (port 5432)
+
+**DATABASE_URL** format:
+- Use the **pooled** connection (port 6543) for better performance
+- Format: `postgres://user:password@host:6543/database?sslmode=require&pgbouncer=true`
 
 ## 🔄 After Setting Variables
 
