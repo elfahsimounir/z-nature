@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { supabaseAdmin } from '@/lib/supabase';
+import crypto from 'crypto';
 
 async function generateUniqueSlugForPublication(desired: string, currentId?: string) {
   let slug = desired;
@@ -46,25 +46,48 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "Invalid product selected" }), { status: 400 });
     }
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     let savedDesktopImage: string | null = null;
     let savedMobileImage: string | null = null;
     let savedLegacyImage: string | null = null;
     if (desktopImageFile) {
-      const p = path.join(uploadsDir, desktopImageFile.name);
-      await fs.writeFile(p, new Uint8Array(await desktopImageFile.arrayBuffer()));
-      savedDesktopImage = `/uploads/${desktopImageFile.name}`;
+      const bytes = await desktopImageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = desktopImageFile.name.includes(".") ? desktopImageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: desktopImageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Desktop upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      savedDesktopImage = publicUrlData.publicUrl;
     }
     if (mobileImageFile) {
-      const p = path.join(uploadsDir, mobileImageFile.name);
-      await fs.writeFile(p, new Uint8Array(await mobileImageFile.arrayBuffer()));
-      savedMobileImage = `/uploads/${mobileImageFile.name}`;
+      const bytes = await mobileImageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = mobileImageFile.name.includes(".") ? mobileImageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: mobileImageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Mobile upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      savedMobileImage = publicUrlData.publicUrl;
     }
     if (imageFile) {
-      const p = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(p, new Uint8Array(await imageFile.arrayBuffer()));
-      savedLegacyImage = `/uploads/${imageFile.name}`;
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Legacy upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      savedLegacyImage = publicUrlData.publicUrl;
       if (!savedDesktopImage) savedDesktopImage = savedLegacyImage;
       if (!savedMobileImage) savedMobileImage = savedLegacyImage;
     }
@@ -111,23 +134,46 @@ export async function PATCH(req: Request) {
     const desired = product.slug;
     const slug = await generateUniqueSlugForPublication(desired, id);
     const data: any = { title, description, slug, productId };
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     if (desktopImageFile && desktopImageFile.size > 0) {
-      const p = path.join(uploadsDir, desktopImageFile.name);
-      await fs.writeFile(p, new Uint8Array(await desktopImageFile.arrayBuffer()));
-      data.desktopImage = `/uploads/${desktopImageFile.name}`;
+      const bytes = await desktopImageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = desktopImageFile.name.includes(".") ? desktopImageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: desktopImageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Desktop upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      data.desktopImage = publicUrlData.publicUrl;
       data.image = data.desktopImage;
     }
     if (mobileImageFile && mobileImageFile.size > 0) {
-      const p = path.join(uploadsDir, mobileImageFile.name);
-      await fs.writeFile(p, new Uint8Array(await mobileImageFile.arrayBuffer()));
-      data.mobileImage = `/uploads/${mobileImageFile.name}`;
+      const bytes = await mobileImageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = mobileImageFile.name.includes(".") ? mobileImageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: mobileImageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Mobile upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      data.mobileImage = publicUrlData.publicUrl;
     }
     if (imageFile && imageFile.size > 0) {
-      const p = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(p, new Uint8Array(await imageFile.arrayBuffer()));
-      data.image = `/uploads/${imageFile.name}`;
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `publications/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Legacy upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      data.image = publicUrlData.publicUrl;
       if (!data.desktopImage) data.desktopImage = data.image;
       if (!data.mobileImage) data.mobileImage = current.mobileImage || data.image;
     }

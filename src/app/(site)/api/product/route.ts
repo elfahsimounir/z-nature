@@ -1,9 +1,9 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import formidable, { Fields, Files } from 'formidable';
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { Readable } from "stream";
+import { supabaseAdmin } from '@/lib/supabase';
+import crypto from 'crypto';
 
 function generateUniqueSlug(baseSlug: string, existingSlugs: Set<string>): string {
   let uniqueSlug = baseSlug;
@@ -136,14 +136,21 @@ export async function POST(req: Request) {
     const existingSlugs = new Set(existingProducts.map((product) => product.slug));
     const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs);
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
 
     const imagePaths: string[] = [];
     for (const imageFile of imageFiles) {
-      const imagePath = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(imagePath, new Uint8Array(await imageFile.arrayBuffer()));
-      imagePaths.push(`/uploads/${imageFile.name}`);
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `products/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      imagePaths.push(publicUrlData.publicUrl);
     }
 
     const newProduct = await prisma.product.create({
@@ -236,13 +243,24 @@ export async function PUT(req: Request) {
       return new Response(JSON.stringify({ error: "Product not found" }), { status: 404 });
     }
 
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
+
     const imagePaths: string[] = [];
     if (files.images) {
       const uploadedFiles = Array.isArray(files.images) ? files.images : [files.images];
+      const fs = await import('fs/promises');
       for (const file of uploadedFiles) {
-        const newPath = path.join("./public/uploads", file.newFilename);
-        await fs.rename(file.filepath, newPath);
-        imagePaths.push(`/uploads/${file.newFilename}`);
+        const buffer = await fs.readFile(file.filepath);
+        const ext = file.originalFilename?.includes(".") ? file.originalFilename.split(".").pop() : "bin";
+        const key = `products/${crypto.randomUUID()}.${ext}`;
+        const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+          contentType: file.mimetype || "application/octet-stream",
+          upsert: false,
+        });
+        if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+        const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+        imagePaths.push(publicUrlData.publicUrl);
+        await fs.unlink(file.filepath).catch(() => {}); // Clean up temp file
       }
     }
 

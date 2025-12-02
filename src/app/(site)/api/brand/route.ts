@@ -1,8 +1,8 @@
 
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { promises as fs } from "fs";
-import path from "path";
+import { supabaseAdmin } from "@/lib/supabase";
+import crypto from "crypto";
 
 export async function GET() {
   try {
@@ -15,6 +15,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // Ensure uploads bucket exists (idempotent)
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
+
     const formData = await req.formData();
     const name = formData.get("name") as string;
     const imageFile = formData.get("image") as File;
@@ -28,16 +31,26 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "Invalid image file" }), { status: 400 });
     }
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    const bytes = await imageFile.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    const imagePath = path.join(uploadsDir, imageFile.name);
-    await fs.writeFile(imagePath, new Uint8Array(await imageFile.arrayBuffer()));
-   console.log('imagePath', imagePath, 'imageFile', imageFile);
+    const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+    const key = `brands/${crypto.randomUUID()}.${ext}`;
+
+    const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+      contentType: imageFile.type || "application/octet-stream",
+      upsert: false,
+    });
+    if (uploadRes.error) {
+      throw new Error(`Upload failed: ${uploadRes.error.message}`);
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+    const publicUrl = publicUrlData.publicUrl;
     const newBrand = await prisma.brand.create({
       data: {
         name,
-        image: `/uploads/${imageFile.name}`,
+        image: publicUrl,
       },
     });
 
@@ -50,6 +63,8 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
+
     const formData = await req.formData();
     const id = formData.get("id") as string;
     const name = formData.get("name") as string;
@@ -68,13 +83,22 @@ export async function PUT(req: Request) {
     const data: any = { name };
 
     if (imageFile && imageFile.size > 0) {
-      const uploadsDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
 
-      const imagePath = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(imagePath, new Uint8Array(await imageFile.arrayBuffer()));
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `brands/${crypto.randomUUID()}.${ext}`;
 
-      data.image = `/uploads/${imageFile.name}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) {
+        throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      }
+
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      data.image = publicUrlData.publicUrl;
     } else {
       // Retain the current image if no new image is uploaded
       data.image = currentBrand.image;

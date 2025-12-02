@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { promises as fs } from "fs";
-import path from "path";
+import { supabaseAdmin } from "@/lib/supabase";
+import crypto from "crypto";
 
 export async function GET() {
   try {
@@ -23,13 +23,20 @@ export async function POST(req: Request) {
     if (!title || isNaN(price)) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
     }
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     const imagePaths: string[] = [];
     for (const file of imageFiles.slice(0, 3)) {
-      const filePath = path.join(uploadsDir, file.name);
-      await fs.writeFile(filePath, Buffer.from(await file.arrayBuffer()));
-      imagePaths.push(`/uploads/${file.name}`);
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+      const key = `services/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      imagePaths.push(publicUrlData.publicUrl);
     }
     const service = await prisma.service.create({
       data: {
@@ -59,13 +66,20 @@ export async function PUT(req: Request) {
     const imageFiles = formData.getAll("images") as File[];
     if (!id) return new Response(JSON.stringify({ error: "Missing id" }), { status: 400 });
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     const imagePaths: string[] = [];
     for (const file of imageFiles.slice(0, 3)) {
-      const filePath = path.join(uploadsDir, file.name);
-      await fs.writeFile(filePath, Buffer.from(await file.arrayBuffer()));
-      imagePaths.push(`/uploads/${file.name}`);
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+      const key = `services/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      imagePaths.push(publicUrlData.publicUrl);
     }
 
     const updated = await prisma.service.update({
