@@ -1,8 +1,8 @@
 
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { promises as fs } from "fs";
-import path from "path";
+import { supabaseAdmin } from "@/lib/supabase";
+import crypto from "crypto";
 
 export async function GET() {
   try {
@@ -24,14 +24,20 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "Name is required" }), { status: 400 });
     }
 
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     let imagePath: string | null = null;
     if (imageFile && imageFile instanceof File) {
-      const uploadsDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
-
-      const imageFilePath = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(imageFilePath, new Uint8Array(await imageFile.arrayBuffer()));
-      imagePath = `/uploads/${imageFile.name}`;
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `hashtags/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      imagePath = publicUrlData.publicUrl;
     }
 
     const newHashtag = await prisma.hashtag.create({
@@ -65,14 +71,20 @@ export async function PUT(req: Request) {
       return new Response(JSON.stringify({ error: "Hashtag not found" }), { status: 404 });
     }
 
+    await supabaseAdmin.storage.createBucket("uploads", { public: true }).catch(() => {});
     let imagePath = currentHashtag.image;
     if (imageFile && imageFile instanceof File) {
-      const uploadsDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
-
-      const imageFilePath = path.join(uploadsDir, imageFile.name);
-      await fs.writeFile(imageFilePath, new Uint8Array(await imageFile.arrayBuffer()));
-      imagePath = `/uploads/${imageFile.name}`;
+      const bytes = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const ext = imageFile.name.includes(".") ? imageFile.name.split(".").pop() : "bin";
+      const key = `hashtags/${crypto.randomUUID()}.${ext}`;
+      const uploadRes = await supabaseAdmin.storage.from("uploads").upload(key, buffer, {
+        contentType: imageFile.type || "application/octet-stream",
+        upsert: false,
+      });
+      if (uploadRes.error) throw new Error(`Upload failed: ${uploadRes.error.message}`);
+      const { data: publicUrlData } = supabaseAdmin.storage.from("uploads").getPublicUrl(key);
+      imagePath = publicUrlData.publicUrl;
     }
 
     const updatedHashtag = await prisma.hashtag.update({
